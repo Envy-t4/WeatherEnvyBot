@@ -4,6 +4,7 @@ import com.github.kotlintelegrambot.Bot
 import com.github.kotlintelegrambot.bot
 import com.github.kotlintelegrambot.dispatch
 import com.github.kotlintelegrambot.dispatcher.*
+import com.github.kotlintelegrambot.dispatcher.handlers.CallbackQueryHandlerEnvironment
 import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.entities.InlineKeyboardMarkup
 import com.github.kotlintelegrambot.entities.TelegramFile
@@ -23,7 +24,7 @@ private const val GIF_WAITING_URL = "https://media.giphy.com/media/Q0MrhO9BUSxKR
 
 class WeatherBot(private val weatherRepository: WeatherRepository) {
 
-    private lateinit var country: String
+    private lateinit var city: String
     private var _chatId: ChatId? = null
     private val chatId by lazy { requireNotNull(_chatId) }
 
@@ -45,24 +46,35 @@ class WeatherBot(private val weatherRepository: WeatherRepository) {
             bot.sendMessage(chatId = chatId, text = "Send me your location")
             location {
                 CoroutineScope(Dispatchers.IO).launch {
-                    country = weatherRepository.getReversedGeocodingCountryName(
+                    val address = weatherRepository.getReversedGeocodingCountryName(
                         latitude = location.latitude.toString(),
                         longitude = location.longitude.toString(), format = "json"
-                    ).address.country
+                    ).address
 
-                    val inlineKeyboardMarkup = InlineKeyboardMarkup.create(
-                        listOf(
-                            InlineKeyboardButton.CallbackData(
-                                text = "Yes, correct",
-                                callbackData = "yes_label"
+                    //city = address.city ?: "${location.latitude},${location.longitude}"
+
+                    address.city?.let { addressCity -> city = addressCity
+                        val inlineKeyboardMarkup = InlineKeyboardMarkup.create(
+                            listOf(
+                                InlineKeyboardButton.CallbackData(
+                                    text = "Yes, correct",
+                                    callbackData = "yes_label"
+                                )
                             )
                         )
-                    )
-                    bot.sendMessage(
-                        chatId = chatId,
-                        text = "Your city is $country?",
-                        replyMarkup = inlineKeyboardMarkup
-                    )
+                        bot.sendMessage(
+                            chatId = chatId,
+                            text = "Your city is $city?",
+                            replyMarkup = inlineKeyboardMarkup
+                        )
+                    } ?: run {
+                        city = "${location.latitude},${location.longitude}"
+                        bot.sendMessage(
+                            chatId = chatId,
+                            text = "Your location is $city",
+                        )
+                        getWeather()
+                    }
                 }
             }
         }
@@ -70,7 +82,7 @@ class WeatherBot(private val weatherRepository: WeatherRepository) {
         callbackQuery(callbackData = "enterManually") {
             bot.sendMessage(chatId = chatId, text = "Enter your city")
             message(Filter.Text) {
-                country = message.text.toString()
+                city = message.text.toString()
 
                 val inlineKeyboardMarkup = InlineKeyboardMarkup.create(
                     listOf(
@@ -82,7 +94,7 @@ class WeatherBot(private val weatherRepository: WeatherRepository) {
                 )
                 bot.sendMessage(
                     chatId = chatId,
-                    text = "Your city is $country?\n If not, please enter your city again",
+                    text = "Your city is $city?\n If not, please enter your city again",
                     replyMarkup = inlineKeyboardMarkup
                 )
             }
@@ -95,39 +107,43 @@ class WeatherBot(private val weatherRepository: WeatherRepository) {
                 sendChatAction(chatId = chatId, action = com.github.kotlintelegrambot.entities.ChatAction.TYPING)
             }
 
-            CoroutineScope(Dispatchers.IO).launch {
-                val currentWeather = weatherRepository.getCurrentWeather(
-                    API_KEY,
-                    country,
-                    "no"
-                )
-                bot.sendMessage(
-                    chatId = chatId,
-                    text = """
-                        ☁️ Cloud: ${currentWeather.current.cloud} %
-                        🌡️ Temperature: ${currentWeather.current.temp_c} C
-                        😨 Feels like: ${currentWeather.current.feelslike_c} C
-                        ✅ Condition: ${currentWeather.current.condition.text}
-                        💧 Humidity: ${currentWeather.current.humidity} %
-                        💨 Wind speed: ${currentWeather.current.wind_kph} km/h
-                        🧭 Wind direction: ${currentWeather.current.wind_dir}
-                        🎈 Pressure: ${currentWeather.current.pressure_mb} mb
-                        🌧️ Precipitation: ${currentWeather.current.precip_mm} mm
-                        🌗 Is it day: ${if (currentWeather.current.is_day == 1) "Yes" else "No"}
-                        🪟 Visibility: ${currentWeather.current.vis_km} km
-                        🌆 City: ${currentWeather.location.name}
-                        🏴󠁥󠁳󠁰󠁶󠁿 Country: ${currentWeather.location.country}
-                        ⏱️ Last updated: ${currentWeather.current.last_updated}
-                    """.trimIndent()
-                )
+            getWeather()
+        }
+    }
 
-                bot.sendMessage(chatId = chatId, text = "You can request another city by typing /weather")
+    private fun CallbackQueryHandlerEnvironment.getWeather() {
+        CoroutineScope(Dispatchers.IO).launch {
+            val currentWeather = weatherRepository.getCurrentWeather(
+                API_KEY,
+                city,
+                "no"
+            )
+            bot.sendMessage(
+                chatId = chatId,
+                text = """
+                            ☁️ Cloud: ${currentWeather.current.cloud} %
+                            🌡️ Temperature: ${currentWeather.current.temp_c} C
+                            😨 Feels like: ${currentWeather.current.feelslike_c} C
+                            ✅ Condition: ${currentWeather.current.condition.text}
+                            💧 Humidity: ${currentWeather.current.humidity} %
+                            💨 Wind speed: ${currentWeather.current.wind_kph} km/h
+                            🧭 Wind direction: ${currentWeather.current.wind_dir}
+                            🎈 Pressure: ${currentWeather.current.pressure_mb} mb
+                            🌧️ Precipitation: ${currentWeather.current.precip_mm} mm
+                            🌗 Is it day: ${if (currentWeather.current.is_day == 1) "Yes" else "No"}
+                            🪟 Visibility: ${currentWeather.current.vis_km} km
+                            🌆 City: ${currentWeather.location.name}
+                            🏴󠁥󠁳󠁰󠁶󠁿 Country: ${currentWeather.location.country}
+                            ⏱️ Last updated: ${currentWeather.current.last_updated}
+                        """.trimIndent()
+            )
 
-                country = ""
+            bot.sendMessage(chatId = chatId, text = "You can request another city by typing /weather")
 
-                //|UV index: ${currentWeather.current.uv}
+            city = ""
 
-            }
+            //|UV index: ${currentWeather.current.uv}
+
         }
     }
 

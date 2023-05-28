@@ -15,8 +15,9 @@ public class WeatherRepository(
     suspend fun getCurrentWeather(apiKey: String, countryName: String, airQualityData: String): CurrentWeather {
         return withContext(Dispatchers.IO){
             weatherApi.getCurrentWeather(
-                '"' + countryName + '"',
-                airQualityData)
+                countryName,
+                airQualityData,
+                )
         }.await()
     }
 
