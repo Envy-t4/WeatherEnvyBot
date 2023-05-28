@@ -10,8 +10,8 @@ import data.remote.api.WeatherApi
 
 
 private const val WEATHER_BASE_URL = "http://api.weatherapi.com/v1/"
-private const val REVERSE_GEOCODER_BASE_URL = "https://nominatim.opentreetmap.org/"
-private const val API_KEY = ""
+private const val REVERSE_GEOCODER_BASE_URL = "https://nominatim.openstreetmap.org/"
+const val API_KEY = ""
 
 enum class RetrofitType(val baseUrl: String) {
     WEATHER(WEATHER_BASE_URL),
@@ -33,6 +33,7 @@ class RetroFitClient {
             .baseUrl(retrofitType.baseUrl)
             .addCallAdapterFactory(CoroutineCallAdapterFactory.invoke())
             .addConverterFactory(GsonConverterFactory.create())
+            .client(getClient())
             .build()
     }
 

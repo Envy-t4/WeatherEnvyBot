@@ -12,9 +12,11 @@ public class WeatherRepository(
     private val reverseGeoCodingApi: ReverseGeocodingApi,
 ) {
 
-    suspend fun getCurrentWaether(apiKey: String, countryName: String, airQualityData: String): CurrentWeather {
+    suspend fun getCurrentWeather(apiKey: String, countryName: String, airQualityData: String): CurrentWeather {
         return withContext(Dispatchers.IO){
-            weatherApi.getCurrentWeather(apiKey, countryName, airQualityData)
+            weatherApi.getCurrentWeather(
+                '"' + countryName + '"',
+                airQualityData)
         }.await()
     }
 
